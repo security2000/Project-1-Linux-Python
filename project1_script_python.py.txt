@@ -1,0 +1,81 @@
+from scapy.all import *
+import socket
+import threading
+import time
+
+# Function to perform a SYN scan to discover open ports
+def syn_scan(target_ip, port):
+    ip = IP(dst=target_ip)
+    syn = TCP(dport=port, flags="S")
+    pkt = ip/syn
+    resp = sr1(pkt, timeout=1, verbose=0)
+    if resp is None:
+        return False
+    elif resp.haslayer(TCP) and resp.getlayer(TCP).flags == 18:  # SYN-ACK
+        return True
+    return False
+
+# Function for banner grabbing
+def grab_banner(target_ip, port):
+    try:
+        s = socket.socket()
+        s.settimeout(2)
+        s.connect((target_ip, port))
+        banner = s.recv(1024)
+        return banner.decode().strip()
+    except Exception as e:
+        return None
+
+# Task II: Scan the network for the target IP
+def network_scan():
+    print("Scanning network range:", network_range)
+    ans, unans = sr(IP(dst=network_range)/ICMP(), timeout=2, verbose=0)
+    for snd, rcv in ans:
+        print(f"Host {rcv.src} is up")
+        if rcv.src == target_ip:
+            print(f"Target IP found: {target_ip}")
+            return
+    print("Target IP not found in the network.")
+
+# Task III: Scan the open ports on the target
+def port_scan():
+    open_ports = []
+    print(f"Scanning open ports on {target_ip}...")
+    for port in [21, 22, 80]:
+        if syn_scan(target_ip, port):
+            print(f"Port {port} is open.")
+            open_ports.append(port)
+        else:
+            print(f"Port {port} is closed.")
+    return open_ports
+
+# Task IV: Banner Grabbing for the discovered open ports
+def banner_grabbing():
+    open_ports = port_scan()
+    print("\nGrabbing banners for open ports...")
+    for port in open_ports:
+        banner = grab_banner(target_ip, port)
+        if banner:
+            print(f"Banner for port {port}: {banner}")
+        else:
+            print(f"No banner found for port {port}")
+
+# Extra Task I: Network Scan and HTTP Service Analysis
+def analyze_http_service():
+    print("\nPerforming HTTP Service Analysis...")
+    banner = grab_banner(target_ip, 80)  # Port 80 for HTTP
+    if banner:
+        print(f"HTTP Banner: {banner}")
+    else:
+        print("No banner received from HTTP service.")
+
+# Function to handle the entire pentest workflow
+def penetration_test():
+    print("Starting penetration test...\n")
+    network_scan()  # Scan for the target in the network
+    banner_grabbing()  # Banner grabbing for open ports
+    analyze_http_service()  # Analyze HTTP service and banners
+
+if __name__ == "__main__":
+    # Run the penetration test
+    penetration_test()
